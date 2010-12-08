@@ -8,8 +8,13 @@ var
 ;
 
 //initialize
+var thread_count = read_thread_count();
+var thread_status = []; // this will be an array of thread_count items.
 var world = context.createImageData(conway.width, conway.height);
+var temp_world;
 var i = 0;
+
+var bm_start, bm_end;
 
 for(i = 0; i < w * h * 4; i += 4) {
 	var value = (Math.random() >= 0.5 ? OFF : ON)
@@ -21,16 +26,42 @@ for(i = 0; i < w * h * 4; i += 4) {
 
 context.putImageData(world, 0, 0);
 
+for (i = 0; i < thread_count; i++) {
+	thread_status[i] = false;
+}
+
 function render() {
-	var temp_world = context.getImageData(0,0,w,h);
+	bm_start = new Date();
+	
+	temp_world = context.getImageData(0,0,w,h);
 	world = context.getImageData(0,0,w,h);
 	world = world.data;
 
 	var i = 0;
+	
+	thread_status = [];
+	
+	// render all chunks
+	for (i = 0; i < thread_count; ++i) {
+		setTimeout('render_chunk(' + i + ')', 0);
+	}	
+}
+
+function render_chunk(chunk_index) {
+	//index is which chunk we're rendering off of.
+		
+	var i = 0;
 	var a, b, c, d;
 	var bors = 0; // neighbor count
 	
-	for (i = 0; i <= w * h * 4; i += 4) {
+	/*
+	console.log("looping from: " + chunk_index * w * (h / thread_count) * 4);
+	console.log("looping to: " + (chunk_index + 1) * w * (h / thread_count) * 4);
+	
+	return;
+	*/
+	
+	for (i = chunk_index * w * (h / thread_count) * 4; i <= (chunk_index + 1) * w * (h / thread_count) * 4; i += 4) {
 		bors = 0;
 		var x = Math.floor((i / 4) % w);
 		var y = Math.floor((i / 4) / w);
@@ -113,12 +144,26 @@ function render() {
 			}
 		}
 	}
+	
+	thread_status.push(true);
+	
+	if (thread_status.length >= thread_count) {
+		context.putImageData(temp_world, 0, 0);
 
-	//console.log('rendered...');
+		bm_end = new Date();
+		
+		document.getElementById('status').innerHTML = (Math.round(1000 / (bm_end - bm_start))) + "fps";
 
-	context.putImageData(temp_world, 0, 0);
+		setTimeout('render()', 1);
+	}
+}
 
-	setTimeout('render()', 1);
+function read_thread_count() {
+	var values = window.location.search.match(/^\?.*threads=(\d+)/);
+	
+	if (!values) { return 2; } // default value
+	
+	return values[1];
 }
 
 render();
